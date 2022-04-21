@@ -2,7 +2,9 @@
 # Imports
 #----------------------------------------------------------------------------#
 
+from distutils import errors
 import json
+from sys import exc_info
 import dateutil.parser
 import babel
 from flask import Flask, render_template, request, Response, flash, redirect, url_for, abort
@@ -107,28 +109,31 @@ def create_venue_form():
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
     venue_form = VenueForm(request.form)
+    if venue_form.validate():
+        try:
+            new_venue = Venue(
+                name=venue_form.name.data,
+                genres=','.join(venue_form.genres.data),
+                address=venue_form.address.data,
+                city=venue_form.city.data,
+                state=venue_form.state.data,
+                phone=venue_form.phone.data,
+                facebook_link=venue_form.facebook_link.data,
+                website=venue_form.website_link.data,
+                image_link=venue_form.image_link.data)
 
-    try:
-        new_venue = Venue(
-            name=venue_form.name.data,
-            genres=','.join(venue_form.genres.data),
-            address=venue_form.address.data,
-            city=venue_form.city.data,
-            state=venue_form.state.data,
-            phone=venue_form.phone.data,
-            facebook_link=venue_form.facebook_link.data,
-            image_link=venue_form.image_link.data)
-
-        new_venue.add()
-        # on successful db insert, flash success
-        flash('Venue ' +
-              request.form['name'] +
-              ' was successfully listed!')
-    except Exception as ex:
-        flash('An error occurred. Venue ' +
-              request.form['name'] + ' could not be listed.')
-        traceback.print_exc()
-
+            new_venue.add()
+            # on successful db insert, flash success
+            flash('Venue ' +
+                request.form['name'] +
+                ' was successfully listed!')
+        except Exception as ex:
+            flash('An error occurred. Venue ' +
+                request.form['name'] + ' could not be listed.')
+            traceback.print_exc()
+    else:
+        for field,err_msgs in venue_form.errors.items():
+            flash('The field ' +field +' has following error messages: ' + ','.join(err_msgs))
     return render_template('pages/home.html')
 
 
@@ -276,25 +281,27 @@ def create_artist_form():
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
     artist_form = ArtistForm(request.form)
-
-    try:
-        new_artist = Artist(
-            name=artist_form.name.data,
-            genres=','.join(artist_form.genres.data),
-            address=artist_form.address.data,
-            city=artist_form.city.data,
-            state=artist_form.state.data,
-            phone=artist_form.phone.data,
-            facebook_link=artist_form.facebook_link.data,
-            image_link=artist_form.image_link.data)
-
-        new_artist.add()
-        # on successful db insert, flash success
-        flash('Artist ' + request.form['name'] + ' was successfully listed!')
-    except Exception as ex:
-        flash('An error occurred. Artist ' +
-              request.form['name'] + ' could not be listed.')
-
+    if artist_form.validate():
+        try:
+            new_artist = Artist(
+                name=artist_form.name.data,
+                genres=','.join(artist_form.genres.data),
+                address=artist_form.address.data,
+                city=artist_form.city.data,
+                state=artist_form.state.data,
+                phone=artist_form.phone.data,
+                facebook_link=artist_form.facebook_link.data,
+                image_link=artist_form.image_link.data,
+                website=artist_form.website_link.data)
+            new_artist.add()
+            # on successful db insert, flash success
+            flash('Artist ' + request.form['name'] + ' was successfully listed!')
+        except Exception as ex:
+            flash('An error occurred. Artist ' +
+                request.form['name'] + ' could not be listed.' + str(ex))
+    else:
+        for field,err_msgs in artist_form.errors.items():
+            flash('The field ' + field +' has following error messages: ' + ','.join(err_msgs))
     return render_template('pages/home.html')
 
 
