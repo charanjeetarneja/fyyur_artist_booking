@@ -1,0 +1,8 @@
+babel
+python-dateutil
+flask-moment
+flask-wtf
+flask-sqlalchemy
+sqlalchemy_utils
+flask_migrate
+flask_script
