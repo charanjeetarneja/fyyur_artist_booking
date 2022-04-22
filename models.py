@@ -13,15 +13,15 @@ class Venue(db.Model):
     name = db.Column(db.String)
     genres = db.Column(db.String)
     city = db.Column(db.String(120))
-    state = db.Column(db.String(120))
-    address = db.Column(db.String(120))
-    phone = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     seeking_talent = db.Column(db.Boolean)
     seeking_description = db.Column(db.String(500))
     website = db.Column(db.String(120))
-
+    state = db.Column(db.String(120))
+    address = db.Column(db.String(120))
+    phone = db.Column(db.String(120))
+    
     def add(self):
         db.session.add(self)
         db.session.commit()
@@ -38,44 +38,42 @@ class Venue(db.Model):
         return '<Venue %r>' % self.id
 
     @property
-    def serialize(self):
+    def srlz(self):
         return {'id': self.id,
                 'name': self.name,
                 'genres': self.genres,
-                #.split(','),
                 'city': self.city,
                 'state': self.state,
-                'phone': self.phone,
-                'genres': self.genres,
-                'address': self.address,
-                'image_link': self.image_link,
-                'facebook_link': self.facebook_link,
-                'website': self.website,
-                'seeking_talent': self.seeking_talent,
-                'seeking_description': self.seeking_description
-                }
-
-    @property
-    def serialize_with_upcoming_shows_count(self):
-        return {'id': self.id,
-                'name': self.name,
-                'city': self.city,
-                'state': self.state,
-                'phone': self.phone,
-                'genres': self.genres,
-                'address': self.address,
+                'phone': self.phone,'address': self.address,
                 'image_link': self.image_link,
                 'facebook_link': self.facebook_link,
                 'website': self.website,
                 'seeking_talent': self.seeking_talent,
                 'seeking_description': self.seeking_description,
+                'genres': self.genres                
+                }
+
+    @property
+    def srlz_upcoming_shows_count(self):
+        return {'id': self.id,
+                'name': self.name,
+                'city': self.city,
+                'state': self.state,
+                'phone': self.phone,
+                'genres': self.genres,
+                'facebook_link': self.facebook_link,
+                'website': self.website,
+                'seeking_talent': self.seeking_talent,
+                'seeking_description': self.seeking_description,
+                'address': self.address,
+                'image_link': self.image_link,
                 'num_shows': Show.query.join(Venue).filter(
                     Show.start_time > datetime.datetime.now(),
                     Show.artist_id == self.id)
                 }
 
     @property
-    def serialize_with_shows_details(self):
+    def srlz_shows_details(self):
         return {'id': self.id,
                 'name': self.name,
                 'city': self.city,
@@ -88,10 +86,10 @@ class Venue(db.Model):
                 'seeking_talent': self.seeking_talent,
                 'seeking_description': self.seeking_description,
                 'website': self.website,
-                'upcoming_shows': [show.serialize_with_artist_venue for show in Show.query.filter(
+                'upcoming_shows': [show.srlz_artist_venue for show in Show.query.filter(
                     Show.start_time > datetime.datetime.now(),
                     Show.venue_id == self.id).all()],
-                'past_shows': [show.serialize_with_artist_venue for show in Show.query.filter(
+                'past_shows': [show.srlz_artist_venue for show in Show.query.filter(
                     Show.start_time < datetime.datetime.now(),
                     Show.venue_id == self.id).all()],
                 'upcoming_shows_count': len(Show.query.join(Venue).filter(
@@ -103,10 +101,10 @@ class Venue(db.Model):
                 }
 
     @property
-    def filter_on_city_state(self):
+    def filter_city_state(self):
         return {'city': self.city,
                 'state': self.state,
-                'venues': [v.serialize_with_upcoming_shows_count
+                'venues': [v.srlz_upcoming_shows_count
                            for v in Venue.query.filter(Venue.city == self.city,
                                                        Venue.state == self.state).all()]}
 
@@ -145,7 +143,7 @@ class Artist(db.Model):
         return '<Artist %r>' % self.id
 
     @property
-    def serialize_with_shows_details(self):
+    def srlz_shows_details(self):
         return {'id': self.id,
                 'name': self.name,
                 'city': self.city,
@@ -157,10 +155,10 @@ class Artist(db.Model):
                 'seeking_venue': self.seeking_venue,
                 'seeking_description': self.seeking_description,
                 'website': self.website,
-                'upcoming_shows': [show.serialize_with_artist_venue for show in Show.query.filter(
+                'upcoming_shows': [show.srlz_artist_venue for show in Show.query.filter(
                     Show.start_time > datetime.datetime.now(),
                     Show.artist_id == self.id).all()],
-                'past_shows': [show.serialize_with_artist_venue for show in Show.query.filter(
+                'past_shows': [show.srlz_artist_venue for show in Show.query.filter(
                     Show.start_time < datetime.datetime.now(),
                     Show.artist_id == self.id).all()],
                 'upcoming_shows_count': len(Show.query.join(Artist).filter(
@@ -172,7 +170,7 @@ class Artist(db.Model):
                 }
 
     @property
-    def serialize(self):
+    def srlz(self):
         return {'id': self.id,
                 'name': self.name,
                 'city': self.city,
@@ -181,7 +179,9 @@ class Artist(db.Model):
                 'genres': self.genres,
                 'image_link': self.image_link,
                 'facebook_link': self.facebook_link,
+                'website': self.website,
                 'seeking_venue': self.seeking_venue,
+                'seeking_description' : self.seeking_description
                 }
 
 
@@ -215,7 +215,7 @@ class Show(db.Model):
         return '<Show %r>' % self.id
 
     @property
-    def serialize(self):
+    def srlz(self):
         return {'id': self.id,
                 'start_time': self.start_time.strftime("%m/%d/%Y, %H:%M:%S"),
                 'venue_id': self.venue_id,
@@ -223,13 +223,13 @@ class Show(db.Model):
                 }
 
     @property
-    def serialize_with_artist_venue(self):
+    def srlz_artist_venue(self):
         return {'id': self.id,
                 'start_time': self.start_time.strftime("%m/%d/%Y, %H:%M:%S"),
                 'venue_id': self.venue_id,
                 'artist_id': self.artist_id,
-                'venue': [v.serialize for v in Venue.query.filter(Venue.id == self.venue_id).all()][0],
-                'artist': [a.serialize for a in Artist.query.filter(Artist.id == self.artist_id).all()][0],
+                'venue': [v.srlz for v in Venue.query.filter(Venue.id == self.venue_id).all()][0],
+                'artist': [a.srlz for a in Artist.query.filter(Artist.id == self.artist_id).all()][0],
                 'artist_name' : Artist.query.join(Show).filter(self.artist_id == Artist.id).all()[0].name,
                 'artist_name_new' : Artist.query.join(Show).filter(self.artist_id == Artist.id).all()[0].name,
                 'artist_image_link' : Artist.query.join(Show).filter(self.artist_id == Artist.id).all()[0].image_link,

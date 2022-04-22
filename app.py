@@ -1,20 +1,19 @@
 #----------------------------------------------------------------------------#
-# Imports
+# Import the libraries
 #----------------------------------------------------------------------------#
-
 from distutils import errors
-import json
 from sys import exc_info
 import dateutil.parser
+import json
 import babel
-from flask import Flask, render_template, request, Response, flash, redirect, url_for, abort
 from flask_moment import Moment
+from flask import Flask, render_template, request, Response, flash, redirect, url_for, abort
 from flask_sqlalchemy import SQLAlchemy
-import logging
-from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
 from sqlalchemy_utils import create_database, database_exists
+import logging
+from logging import Formatter, FileHandler
 import config
 from models import db, Artist, Venue, Show
 import traceback
@@ -22,7 +21,7 @@ from flask_migrate import Migrate
 from sqlalchemy.orm.exc import NoResultFound
 
 #----------------------------------------------------------------------------#
-# App Config.
+# Application config Config.
 #----------------------------------------------------------------------------#
 
 app = Flask(__name__)
@@ -34,7 +33,6 @@ migrate = Migrate(app, db)
 #----------------------------------------------------------------------------#
 # Filters.
 #----------------------------------------------------------------------------#
-
 
 def format_datetime(value, format='medium'):
   print(value)
@@ -51,19 +49,18 @@ app.jinja_env.filters['datetime'] = format_datetime
 # Controllers.
 #----------------------------------------------------------------------------#
 
-
 @app.route('/')
 def index():
     return render_template('pages/home.html')
 
-
-#  Venues
-#  ----------------------------------------------------------------
+#----------------------------------------------------------------------------#
+# Venues : Get/Search
+#----------------------------------------------------------------------------#
 
 @app.route('/venues')
 def venues():
     unique_city_states = Venue.query.distinct(Venue.city, Venue.state).all()
-    data = [ucs.filter_on_city_state for ucs in unique_city_states]
+    data = [uniq_st.filter_city_state for uniq_st in unique_city_states]
     return render_template('pages/venues.html', areas=data)
 
 
@@ -72,10 +69,10 @@ def search_venues():
     search_term = request.form.get('search_term', None)
     venues = Venue.query.filter(
         Venue.name.ilike("%{}%".format(search_term))).all()
-    count_venues = len(venues)
+    venue_count = len(venues)
     response = {
-        "count": count_venues,
-        "data": [v.serialize for v in venues]
+        "count": venue_count,
+        "data": [v.srlz for v in venues]
     }
     return render_template('pages/search_venues.html', results=response, search_term=request.form.get('search_term', ''))
 
@@ -83,246 +80,240 @@ def search_venues():
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
     venues = Venue.query.filter(Venue.id == venue_id).one_or_none()
-
     if venues is None:
         abort(404)
-
-    # data = [v.serialize_with_upcoming_shows_count for v in venues][0]
-
-    #past_shows = db.session.query(Show).join(Venue).filter(Show.artist_id==artist_id).filter(Show.start_time>datetime.now()).all()
-
-    data = venues.serialize_with_shows_details
+    data = venues.srlz_shows_details
     return render_template('pages/show_venue.html', venue=data)
 
-
-
-#  Create Venue
 #  ----------------------------------------------------------------
-
+#  Venues: Create a Venue
+#  ----------------------------------------------------------------
 
 @app.route('/venues/create', methods=['GET'])
 def create_venue_form():
-    form = VenueForm()
-    return render_template('forms/new_venue.html', form=form)
-
+    ven_form = VenueForm()
+    return render_template('forms/new_venue.html', form=ven_form)
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
-    venue_form = VenueForm(request.form)
-    if venue_form.validate():
+    ven_form = VenueForm(request.form)
+    if ven_form.validate():
         try:
             new_venue = Venue(
-                name=venue_form.name.data,
-                genres=','.join(venue_form.genres.data),
-                address=venue_form.address.data,
-                city=venue_form.city.data,
-                state=venue_form.state.data,
-                phone=venue_form.phone.data,
-                facebook_link=venue_form.facebook_link.data,
-                website=venue_form.website_link.data,
-                image_link=venue_form.image_link.data)
-
+                name=ven_form.name.data,
+                state=ven_form.state.data,
+                phone=ven_form.phone.data,
+                facebook_link=ven_form.facebook_link.data,
+                website=ven_form.website.data,
+                genres=','.join(ven_form.genres.data),
+                address=ven_form.address.data,
+                city=ven_form.city.data,
+                image_link=ven_form.image_link.data,
+                seeking_talent = ven_form.seeking_talent.data,
+                seeking_description = ven_form.seeking_description.data)
             new_venue.add()
-            # on successful db insert, flash success
+            # Successful insert into Database - notify on UI
             flash('Venue ' +
                 request.form['name'] +
-                ' was successfully listed!')
-        except Exception as ex:
-            flash('An error occurred. Venue ' +
-                request.form['name'] + ' could not be listed.')
+                ' was successfully onboarded.'+str(type(ven_form.genres.data)))
+        except Exception as e:
+            flash('Venue ' + request.form['name'] +  ' could not be onboarded. There was an error, please try again. ' + str(e))
             traceback.print_exc()
     else:
-        for field,err_msgs in venue_form.errors.items():
-            flash('The field ' +field +' has following error messages: ' + ','.join(err_msgs))
+        for field,err_msgs in ven_form.errors.items():
+            flash('The field ' + field +' has following error messages: ' + ','.join(err_msgs))
     return render_template('pages/home.html')
 
-
-@app.route('/venues/<venue_id>', methods=['DELETE'])
-def delete_venue(venue_id):
-    try:
-        venue_to_delete = Venue.query.filter(Venue.id == venue_id).delete()
-        try:
-            db.session.commit()
-        except:
-            db.session.rollback()
-        finally:
-            db.session.close()
-        flash("Venue {0} has been deleted successfully".format(
-            venue_to_delete[0]['name']))
-    except NoResultFound:
-        abort(404)
-
-#  Artists
 #  ----------------------------------------------------------------
-@app.route('/artists')
-def artists():
-    artists = Artist.query.all()
-    data = [artist.serialize_with_shows_details for artist in artists]
-    return render_template('pages/artists.html', artists=data)
-
-
-@app.route('/artists/search', methods=['POST'])
-def search_artists():
-    search_term = request.form.get('search_term', None)
-    artists = Artist.query.filter(
-        Artist.name.ilike("%{}%".format(search_term))).all()
-    count_artists = len(artists)
-    response = {
-        "count": count_artists,
-        "data": [a.serialize for a in artists]
-    }
-    return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
-
-
-@app.route('/artists/<int:artist_id>')
-def show_artist(artist_id):
-    artist = Artist.query.filter(Artist.id == artist_id).one_or_none()
-
-    if artist is None:
-        abort(404)
-
-    data = artist.serialize_with_shows_details
-
-    return render_template('pages/show_artist.html', artist=data)
-
-#  Update
+#  Venue : Edit an Venue
 #  ----------------------------------------------------------------
-@app.route('/artists/<int:artist_id>/edit', methods=['GET'])
-def edit_artist(artist_id):
-    artist_form = ArtistForm()
-
-    artist_to_update = Artist.query.filter(
-        Artist.id == artist_id).one_or_none()
-    if artist_to_update is None:    
-        abort(404)
-
-    artist = artist_to_update.serialize
-    form = ArtistForm(data=artist)
-    return render_template('forms/edit_artist.html', form=form, artist=artist)
-
-
-@app.route('/artists/<int:artist_id>/edit', methods=['POST'])
-def edit_artist_submission(artist_id):
-    form = ArtistForm(request.form)
-    try:
-        artist = Artist.query.filter_by(id=artist_id).one()
-        artist.name = form.name.data,
-        artist.genres = json.dumps(form.genres.data),  # array json
-        artist.city = form.city.data,
-        artist.state = form.state.data,
-        artist.phone = form.phone.data,
-        artist.facebook_link = form.facebook_link.data,
-        artist.image_link = form.image_link.data,
-        try:
-            db.session.commit()
-        except:
-            db.session.rollback()
-        finally:
-            db.session.close()
-        # on successful db insert, flash success
-        flash('Artist ' + request.form['name'] + ' was successfully updated!')
-    except Exception as e:
-        flash('An error occurred. Artist ' +
-              request.form['name'] + ' could not be updated.')
-        print(e)
-    return redirect(url_for('show_artist', artist_id=artist_id))
-
-
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
-    venue_form = VenueForm()
 
-    venue_to_update = Venue.query.filter(Venue.id == venue_id).one_or_none()
-    if venue_to_update is None:
+    ven_update = Venue.query.filter(Venue.id == venue_id).one_or_none()
+    if ven_update is None: 
         abort(404)
 
-    venue = venue_to_update.serialize
-    form = VenueForm(data=venue)
-    return render_template('forms/edit_venue.html', form=form, venue=venue)
+    ven = ven_update.srlz
+    ven_form = VenueForm(data=ven)
+
+    return render_template('forms/edit_venue.html', form=ven_form, venue=ven)
 
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):  
-    form = VenueForm(request.form)
+    ven_form = VenueForm(request.form)
+    if ven_form.validate():
+        try:
+            ven = Venue.query.filter(Venue.id==venue_id).one()
+            ven.name = ven_form.name.data
+            ven.city = ven_form.city.data
+            ven.state = ven_form.state.data
+            ven.phone = ven_form.phone.data
+            ven.facebook_link = ven_form.facebook_link.data
+            ven.image_link = ven_form.image_link.data
+            ven.website = ven_form.website.data
+            ven.address = ven_form.address.data
+            ven.genres = ','.join(ven_form.genres.data)
+            ven.seeking_talent=ven_form.seeking_talent.data
+            ven.seeking_description = ven_form.seeking_description.data
+            db.session.commit()
+            # Successful insert into Database - notify on UI
+            flash('Venue ' + request.form['name'] + ' was successfully edited.')
+        except Exception as e:
+            flash('Venue ' + request.form['name'] + ' could not be edited.There was an error, please try again.' + str(e))
+    else:
+        for field,err_msgs in ven_form.errors.items():
+            flash('The field ' + field +' has following error messages: ' + ','.join(err_msgs))
+    return redirect(url_for('show_venue', venue_id=venue_id))
+
+#  ----------------------------------------------------------------
+#  Venues: Delete a Venue
+#  ----------------------------------------------------------------
+
+@app.route('/venues/<venue_id>', methods=['DELETE'])
+def delete_venue(venue_id):
     try:
-        venue = Venue.query.filter(Venue.id==venue_id).one()
-        venue.name = form.name.data,
-        venue.address = form.address.data,
-        venue.genres = ','.join(form.genres.data),  # array json
-        venue.city = form.city.data,
-        venue.state = form.state.data,
-        venue.phone = form.phone.data,
-        venue.facebook_link = form.facebook_link.data,
-        venue.image_link = form.image_link.data,
+        ven = Venue.query.filter(Venue.id == venue_id).delete()
         try:
             db.session.commit()
         except:
             db.session.rollback()
         finally:
             db.session.close()
-        # on successful db insert, flash success
-        flash('Venue ' + request.form['name'] + ' was successfully updated!')
-    except Exception as e:
-        flash('An error occurred. Venue ' +
-              request.form['name'] + ' could not be updated.')
+        flash('Venue '+ ven[0]['name'] +'has been deleted.')
+    except NoResultFound:
+        abort(404)
+    return render_template('pages/home.html')
 
-    return redirect(url_for('show_venue', venue_id=venue_id))
-
-#  Create Artist
+#  ----------------------------------------------------------------
+#  Artists : Get/Search
 #  ----------------------------------------------------------------
 
+@app.route('/artists')
+def artists():
+    art = Artist.query.all()
+    data = [a.srlz_shows_details for a in art]
+    return render_template('pages/artists.html', artists=data)
+
+@app.route('/artists/search', methods=['POST'])
+def search_artists():
+    srch_trm = request.form.get('search_term', None)
+    art = Artist.query.filter(Artist.name.ilike("%{}%".format(srch_trm))).all()
+    art_cnt = len(art)
+    response = {
+        "count": art_cnt,
+        "data": [a.srlz for a in art]
+    }
+    return render_template('pages/search_artists.html', results=response, search_term=request.form.get('search_term', ''))
+
+@app.route('/artists/<int:artist_id>')
+def show_artist(artist_id):
+    art = Artist.query.filter(Artist.id == artist_id).one_or_none()
+
+    if art is None:
+        abort(404)
+
+    art_data = art.srlz_shows_details
+
+    return render_template('pages/show_artist.html', artist=art_data)
+
+#  ----------------------------------------------------------------
+#  Artists : Create an Artist
+#  ----------------------------------------------------------------
 
 @app.route('/artists/create', methods=['GET'])
 def create_artist_form():
-    form = ArtistForm()
-    return render_template('forms/new_artist.html', form=form)
+    art_form = ArtistForm()
+    return render_template('forms/new_artist.html', form=art_form)
 
 
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
-    artist_form = ArtistForm(request.form)
-    if artist_form.validate():
+    art_form = ArtistForm(request.form)
+    if art_form.validate():
         try:
             new_artist = Artist(
-                name=artist_form.name.data,
-                genres=','.join(artist_form.genres.data),
-                address=artist_form.address.data,
-                city=artist_form.city.data,
-                state=artist_form.state.data,
-                phone=artist_form.phone.data,
-                facebook_link=artist_form.facebook_link.data,
-                image_link=artist_form.image_link.data,
-                website=artist_form.website_link.data)
+                name=art_form.name.data,
+                phone=art_form.phone.data,
+                facebook_link=art_form.facebook_link.data,
+                image_link=art_form.image_link.data,
+                website=art_form.website.data,
+                genres=','.join(art_form.genres.data),
+                address=art_form.address.data,
+                city=art_form.city.data,
+                state=art_form.state.data,
+                seeking_venue=art_form.seeking_venue.data,
+                seeking_description=art_form.seeking_description.data)
             new_artist.add()
-            # on successful db insert, flash success
-            flash('Artist ' + request.form['name'] + ' was successfully listed!')
-        except Exception as ex:
-            flash('An error occurred. Artist ' +
-                request.form['name'] + ' could not be listed.' + str(ex))
+            # Successful insert into Database - notify on UI
+            flash('Artist ' + request.form['name'] + ' was successfully onboarded.')
+        except Exception as e:
+            flash('An error occurred. Artist ' + request.form['name'] + ' could not be onboarded. There was an error, please try again. ' + str(e))
     else:
-        for field,err_msgs in artist_form.errors.items():
+        for field,err_msgs in art_form.errors.items():
             flash('The field ' + field +' has following error messages: ' + ','.join(err_msgs))
     return render_template('pages/home.html')
+    
+#  ----------------------------------------------------------------
+#  Artist : Edit an Artist
+#  ----------------------------------------------------------------
+@app.route('/artists/<int:artist_id>/edit', methods=['GET'])
+def edit_artist(artist_id):
+
+    art_update = Artist.query.filter(Artist.id == artist_id).one_or_none()
+    if art_update is None:    
+        abort(404)
+    else:    
+        art = art_update.srlz
+        art_form = ArtistForm(data=art)
+    return render_template('forms/edit_artist.html', form=art_form, artist=art)
 
 
-#  Shows
+@app.route('/artists/<int:artist_id>/edit', methods=['POST'])
+def edit_artist_submission(artist_id):
+    art_form = ArtistForm(request.form)
+    if art_form.validate():
+        try:
+            art_update = Artist.query.filter_by(id=artist_id).one()
+            art_update.artist.name = art_form.name.data
+            art_update.state = art_form.state.data
+            art_update.phone = art_form.phone.data
+            art_update.facebook_link = art_form.facebook_link.data
+            art_update.image_link = art_form.image_link.data
+            art_update.website = art_form.website.data
+            art_update.genres = ','.join(art_form.genres.data)
+            art_update.city = art_form.city.data
+            art_update.seeking_venue=art_form.seeking_venue.data
+            art_update.seeking_description=art_form.seeking_description.data
+            db.session.commit()
+            # Successful insert into Database - notify on UI
+            flash('Artist ' + request.form['name'] + ' was successfully edited.')
+        except Exception as e:
+            flash('Artist ' + request.form['name'] + ' could not be edited. An error occurred.' + str(e))
+    else:
+        for field,err_msgs in art_form.errors.items():
+            flash('The field ' + field +' has following error messages: ' + ','.join(err_msgs))
+    return redirect(url_for('show_artist', artist_id=artist_id))
+
+#  ----------------------------------------------------------------
+#  Shows : Get
 #  ----------------------------------------------------------------
 
 @app.route('/shows')
 def shows():
-    shows = Show.query.all()
-    data = [show.serialize_with_artist_venue for show in shows]
-    print(type(data))
-    print(data)
-    return render_template('pages/shows.html', shows=data)
+    shs = Show.query.all()
+    shows_data = [s.srlz_artist_venue for s in shs]
+    return render_template('pages/shows.html', shows=shows_data)
 
+#  ----------------------------------------------------------------
+#  Shows : Create a show
+#  ----------------------------------------------------------------
 
 @app.route('/shows/create')
 def create_shows():
-    # renders form. do not touch.
     form = ShowForm()
     return render_template('forms/new_show.html', form=form)
-
 
 @app.route('/shows/create', methods=['POST'])
 def create_show_submission():
@@ -334,11 +325,10 @@ def create_show_submission():
             start_time=show_form.start_time.data
         )
         show.add()
-        # on successful db insert, flash success
-        flash('Show was successfully listed!')
+        # Successful insert into Database - notify on UI
+        flash('Show was successfully onboarded.')
     except Exception as e:
-        flash('An error occurred. Show could not be listed.')
-        print(e)
+        flash('Show could not be onboarded. An error occured, please try again.'+str(e))
 
     return render_template('pages/home.html')
 

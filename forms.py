@@ -117,8 +117,8 @@ class VenueForm(Form):
     facebook_link = StringField(
         'facebook_link', validators=[URL(message='Please use a valid Facebook Link.')]
     )
-    website_link = StringField(
-        'website_link', validators=[URL(message='Please use a valid website Link.')]
+    website = StringField(
+        'website', validators=[URL(message='Please use a valid website Link.')]
     )
     seeking_talent = BooleanField( 'seeking_talent' )
 
@@ -228,8 +228,8 @@ class ArtistForm(Form):
         'facebook_link', validators=[URL(message='Please use a valid facebook Link.')]
     )
     
-    website_link = StringField(
-        'website_link',validators=[URL(message='Please use a valid Website Link.')]
+    website = StringField(
+        'website',validators=[URL(message='Please use a valid Website Link.')]
      )
 
     seeking_venue = BooleanField( 'seeking_venue' )
